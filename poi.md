@@ -1,8 +1,8 @@
-= Points of interrest
+# Points of interrest
 
-== Number of backoff waits
+## Number of backoff waits
 
-https://github.com/open-sdr/openwifi-hw/blob/5705bb3a200270768235be0dc189d5aed0664e35/ip/xpu/src/csma_ca.v#L267
+<https://github.com/open-sdr/openwifi-hw/blob/5705bb3a200270768235be0dc189d5aed0664e35/ip/xpu/src/csma_ca.v#L267>
 
 Packages are sent when the statemachine is in `BACKOFF_RUN`.
 `ch_idle_final` is on when CCA finds the channel idle.
