@@ -7,7 +7,7 @@ Different ways to extract the measured data.
 Seems to be a function in Xilinx vivado.
 Recommended by openwifi as a method to extract state of internal state machines.
 
-https://github.com/open-sdr/openwifi/tree/master/doc
+<https://github.com/open-sdr/openwifi/tree/master/doc>
 
 ## Using AXI without DMA
 
