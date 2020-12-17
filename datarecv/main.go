@@ -1,59 +1,99 @@
 package main
 
 import (
-    "fmt"
-    "time"
-    "encoding/binary"
-    "log"
-    "sync/atomic"
-    "os"
-    "net"
+	"encoding/binary"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"os"
+	"sync/atomic"
+	"time"
 )
 
-const bufflen = 16
+type Measurement struct {
+	Timestamp uint64
+	Value     uint32
+}
+
+func NewMeasurementFromBuffer(buffer []byte) (m Measurement) {
+	m.Timestamp = binary.LittleEndian.Uint64(buffer[0:])
+	m.Value = binary.LittleEndian.Uint32(buffer[8:])
+
+	return
+}
+
+func (m *Measurement) WriteToFile(f io.Writer) error {
+	_, err := fmt.Fprintf(f, "%d,%d\n", m.Timestamp, m.Value)
+	return err
+}
+
+func ParseBuffer(buffer []byte) []Measurement {
+	log.Printf("Parsing %v", buffer)
+	// First read out number of measurements
+	num := buffer[0]
+	log.Printf("%d measurements", num)
+	buffer = buffer[1:]
+
+	// Allocate array
+	res := make([]Measurement, num)
+
+	// Populate array
+	for i := 0; i < int(num); i++ {
+		res[i] = NewMeasurementFromBuffer(buffer[i*12:])
+	}
+
+	return res
+}
+
+const bufflen = 128
 
 var count uint32 = 0
 
 func main() {
-    f, err := os.OpenFile("data", os.O_RDWR|os.O_CREATE, 0755)
-    if err != nil {
-        log.Fatal(err)
-    }
+    outname := flag.String("out", "data.csv", "File to use for outputting data")
+    flag.Parse()
 
-    pc, err := net.ListenPacket("udp", ":8000")
-    fmt.Printf("Starting\n")
-    if err != nil {
-        log.Fatal(err)
-    }
+	f, err := os.OpenFile(*outname, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    go status()
+	pc, err := net.ListenPacket("udp", ":8000")
+	fmt.Printf("Starting\n")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    buff := make([]byte, bufflen*4)
+	go status()
 
-    for {
-        n, _, err := pc.ReadFrom(buff)
-        if err != nil {
-            log.Fatal(err)
-        }
+	buff := make([]byte, bufflen*12)
 
-        // Convert to number of uint32
-        n = n / 4
+	for {
+		n, _, err := pc.ReadFrom(buff)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-        for i := 0; i < n; i++ {
-            value := binary.LittleEndian.Uint32(buff[i * 4:(i+1)*4])
-            fmt.Fprintf(f, "%d\n", value)
-        }
+		// Parse buffer
+		results := ParseBuffer(buff[0:n])
 
-        atomic.AddUint32(&count, uint32(n))
-    }
+		for i, res := range results {
+			log.Printf("%d, Got %v", i, res)
+			res.WriteToFile(f)
+		}
+
+		atomic.AddUint32(&count, uint32(len(results)))
+	}
 }
 
 func status() {
-    var last uint32 = 0
-    for {
-        now := atomic.LoadUint32(&count)
-        fmt.Printf("Received %d, since last %d\n", now, now - last)
-        last = now
-        time.Sleep(1 * time.Second)
-    }
+	var last uint32 = 0
+	for {
+		now := atomic.LoadUint32(&count)
+		fmt.Printf("Received %d, since last %d\n", now, now-last)
+		last = now
+		time.Sleep(1 * time.Second)
+	}
 }
