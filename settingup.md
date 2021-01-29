@@ -54,7 +54,7 @@ This is often done automatically by your operating system.
 Next copy the following files:
 
 1. Copy all files in `BOOT/openwifi/zed_fmcs2/` to `BOOT/`.
-2. Copy `BOOT/zynq-common/uImage` into `BOOT/`.
+2. Copy all files in `BOOT/openwifi/zynq-common/` into `BOOT/`.
 
 **Securely** unmount the sdcard.
 

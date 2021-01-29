@@ -12,21 +12,42 @@ import (
 	"time"
 )
 
+type FPGAValue uint32
+
 type Measurement struct {
 	Timestamp uint64
-	Value     uint32
+	Value     FPGAValue
+}
+
+func (v FPGAValue) split() (uint16, uint16) {
+    return uint16((v >> 16) & 0xFFFF), uint16(v & 0xFFFF)
+}
+
+func (v FPGAValue) FormatCsv() string {
+    random, backoff := v.split()
+    return fmt.Sprintf("%d,%d", random, backoff)
+}
+
+func (v FPGAValue) String() string {
+    random, backoff := v.split()
+    return fmt.Sprintf("{random: %d, backoff: %d}", random, backoff)
 }
 
 func NewMeasurementFromBuffer(buffer []byte) (m Measurement) {
 	m.Timestamp = binary.LittleEndian.Uint64(buffer[0:])
-	m.Value = binary.LittleEndian.Uint32(buffer[8:])
+	m.Value = FPGAValue(binary.LittleEndian.Uint32(buffer[8:]))
 
 	return
 }
 
-func (m *Measurement) WriteToFile(f io.Writer) error {
-	_, err := fmt.Fprintf(f, "%d,%d\n", m.Timestamp, m.Value)
-	return err
+func WriteHeader(f io.Writer) (err error) {
+    _, err = fmt.Fprintln(f, "time, random, backoff")
+    return
+}
+
+func (m *Measurement) WriteToFile(f io.Writer) (err error) {
+	_, err = fmt.Fprintf(f, "%d,%s\n", m.Timestamp, m.Value.FormatCsv())
+	return
 }
 
 func ParseBuffer(buffer []byte) []Measurement {
@@ -59,6 +80,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+    err = WriteHeader(f)
+    if err != nil {
+        log.Fatal(err)
+    }
 
 	pc, err := net.ListenPacket("udp", ":8000")
 	fmt.Printf("Starting\n")
